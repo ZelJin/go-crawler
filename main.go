@@ -61,11 +61,14 @@ func extractLinks(body io.ReadCloser) (links []string) {
 }
 
 // Crawl a page specified by domain and relative path
-func crawlPage(host, path string, pages map[string]StringSet) error {
+func crawlPage(host, path string, pages map[string]StringSet, depth, maxDepth int) error {
 	// Return if this path already exists
 	if _, found := pages[path]; found {
 		fmt.Println("Page has already been crawled, skipping.")
 		return nil
+	}
+	if depth == maxDepth {
+		fmt.Println("Maximum depth has been reached, skipping.")
 	}
 	// Add page to the global state
 	pages[path] = NewStringSet()
@@ -86,7 +89,7 @@ func crawlPage(host, path string, pages map[string]StringSet) error {
 		if url.Hostname() == host || url.Hostname() == "" {
 			fmt.Printf("Found link: %v -> %v\n", path, url.Path)
 			pages[path].Add(url.Path)
-			crawlPage(host, url.Path, pages)
+			crawlPage(host, url.Path, pages, depth+1, maxDepth)
 		}
 	}
 	return nil
@@ -95,24 +98,34 @@ func crawlPage(host, path string, pages map[string]StringSet) error {
 func printSitemap(pages map[string]StringSet) {
 	fmt.Println("Sitemap:")
 	for page, linkSet := range pages {
-		fmt.Println("/" + page)
+		fmt.Println(page)
 		links := linkSet.List()
 		for i, link := range links {
 			symbol := "├── "
 			if i == len(links)-1 {
 				symbol = "└── "
 			}
-			fmt.Println(symbol, "/"+link)
+			fmt.Println(symbol, link)
 		}
 	}
 }
 
 func main() {
+	var depth int
+
 	app := cli.NewApp()
 	app.Name = "go-crawler"
 	app.Usage = "Generate a sitemap for a given hostname."
 	app.UsageText = "go-crawler [hostname]"
 	app.Version = "1.0.0"
+	app.Flags = []cli.Flag{
+		cli.IntFlag{
+			Name:        "d, depth",
+			Value:       10,
+			Usage:       "Maximum crawling depth",
+			Destination: &depth,
+		},
+	}
 
 	app.Action = func(c *cli.Context) error {
 		if !c.Args().Present() {
@@ -125,7 +138,7 @@ func main() {
 		// State is stored in a map, where keys are relative paths,
 		// and value is a slice of links to other pages.
 		pages := map[string]StringSet{}
-		err := crawlPage(host, "", pages)
+		err := crawlPage(host, "", pages, 0, depth)
 		if err != nil {
 			fmt.Println(err)
 		}
