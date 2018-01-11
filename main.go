@@ -64,11 +64,26 @@ func crawlPage(host, path string, pages map[string][]string) error {
 		}
 		//fmt.Println(url.Hostname())
 		if url.Hostname() == host || url.Hostname() == "" {
+			fmt.Printf("Found link: %v -> %v\n", path, url.Path)
 			pages[path] = append(pages[path], url.Path)
 			crawlPage(host, url.Path, pages)
 		}
 	}
 	return nil
+}
+
+func printSitemap(pages map[string][]string) {
+	fmt.Println("Sitemap:")
+	for page, links := range pages {
+		fmt.Println(page)
+		for i, link := range links {
+			symbol := "├── "
+			if i == len(links)-1 {
+				symbol = "└── "
+			}
+			fmt.Println(symbol, link)
+		}
+	}
 }
 
 func main() {
@@ -93,7 +108,7 @@ func main() {
 		if err != nil {
 			fmt.Println(err)
 		}
-		fmt.Printf("+%v", pages)
+		printSitemap(pages)
 		return nil
 	}
 
