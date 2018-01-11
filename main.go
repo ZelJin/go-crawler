@@ -11,28 +11,6 @@ import (
 	"golang.org/x/net/html"
 )
 
-type StringSet struct {
-	set map[string]bool
-}
-
-func NewStringSet() StringSet {
-	return StringSet{map[string]bool{}}
-}
-
-func (s StringSet) Add(value string) bool {
-	_, found := s.set[value]
-	s.set[value] = true
-	return !found
-}
-
-func (s StringSet) List() []string {
-	list := make([]string, 0, len(s.set))
-	for k := range s.set {
-		list = append(list, k)
-	}
-	return list
-}
-
 // Fetch page using http.Get
 func fetchPage(host, path string) (*http.Response, error) {
 	url := url.URL{Scheme: "http", Host: host, Path: path}
@@ -99,10 +77,9 @@ func printSitemap(pages map[string]StringSet) {
 	fmt.Println("Sitemap:")
 	for page, linkSet := range pages {
 		fmt.Println(page)
-		links := linkSet.List()
-		for i, link := range links {
+		for i, link := range linkSet.List() {
 			symbol := "├── "
-			if i == len(links)-1 {
+			if i == linkSet.Length()-1 {
 				symbol = "└── "
 			}
 			fmt.Println(symbol, link)
