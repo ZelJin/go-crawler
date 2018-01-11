@@ -39,9 +39,9 @@ func extractLinks(body io.ReadCloser) (links []string) {
 }
 
 // Crawl a page specified by domain and relative path
-func crawlPage(host, path string, pages map[string]StringSet, depth, maxDepth int) error {
+func crawlPage(host, path string, sitemap Sitemap, depth, maxDepth int) error {
 	// Return if this path already exists
-	if _, found := pages[path]; found {
+	if _, found := sitemap[path]; found {
 		fmt.Println("Page has already been crawled, skipping.")
 		return nil
 	}
@@ -49,7 +49,7 @@ func crawlPage(host, path string, pages map[string]StringSet, depth, maxDepth in
 		fmt.Println("Maximum depth has been reached, skipping.")
 	}
 	// Add page to the global state
-	pages[path] = NewStringSet()
+	sitemap[path] = NewStringSet()
 	// Fetch the page
 	res, err := fetchPage(host, path)
 	if err != nil {
@@ -66,25 +66,11 @@ func crawlPage(host, path string, pages map[string]StringSet, depth, maxDepth in
 		//fmt.Println(url.Hostname())
 		if url.Hostname() == host || url.Hostname() == "" {
 			fmt.Printf("Found link: %v -> %v\n", path, url.Path)
-			pages[path].Add(url.Path)
-			crawlPage(host, url.Path, pages, depth+1, maxDepth)
+			sitemap[path].Add(url.Path)
+			crawlPage(host, url.Path, sitemap, depth+1, maxDepth)
 		}
 	}
 	return nil
-}
-
-func printSitemap(pages map[string]StringSet) {
-	fmt.Println("Sitemap:")
-	for page, linkSet := range pages {
-		fmt.Println(page)
-		for i, link := range linkSet.List() {
-			symbol := "├── "
-			if i == linkSet.Length()-1 {
-				symbol = "└── "
-			}
-			fmt.Println(symbol, link)
-		}
-	}
 }
 
 func main() {
@@ -114,12 +100,12 @@ func main() {
 		// Create a global storage for pages
 		// State is stored in a map, where keys are relative paths,
 		// and value is a slice of links to other pages.
-		pages := map[string]StringSet{}
-		err := crawlPage(host, "", pages, 0, depth)
+		sitemap := Sitemap{}
+		err := crawlPage(host, "", sitemap, 0, depth)
 		if err != nil {
 			fmt.Println(err)
 		}
-		printSitemap(pages)
+		sitemap.Print()
 		return nil
 	}
 
