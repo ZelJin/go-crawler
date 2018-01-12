@@ -17,6 +17,11 @@ type CrawlState struct {
 	Depth int
 }
 
+type Page struct {
+	Path    string
+	LinkSet StringSet
+}
+
 // Fetch page using http.Get
 func fetchPage(host, path string) (*http.Response, error) {
 	url := url.URL{Scheme: "http", Host: host, Path: path}
@@ -45,7 +50,7 @@ func extractLinks(body io.ReadCloser) (links []string) {
 }
 
 // Crawl a page specified by domain and relative path
-func crawlPage(host string, sitemap Sitemap, state CrawlState, queue chan CrawlState, finished chan bool) error {
+func crawlPage(host string, sitemap Sitemap, state CrawlState, chQueue chan CrawlState, chWrite chan Page, chFinished chan bool) error {
 	// Return if this path already exists
 	if _, found := sitemap[state.Path]; found {
 		fmt.Println("Page has already been crawled, skipping.")
@@ -56,7 +61,8 @@ func crawlPage(host string, sitemap Sitemap, state CrawlState, queue chan CrawlS
 		return nil
 	}
 	// Add page to the global state
-	sitemap[state.Path] = NewStringSet()
+	page := Page{state.Path, NewStringSet()}
+	chWrite <- page
 	// Fetch the page
 	fmt.Printf("Crawling %v\n", state.Path)
 	res, err := fetchPage(host, state.Path)
@@ -64,7 +70,7 @@ func crawlPage(host string, sitemap Sitemap, state CrawlState, queue chan CrawlS
 		return err
 	}
 
-	defer func() { finished <- true }()
+	defer func() { chFinished <- true }()
 
 	// Extract links
 	defer res.Body.Close()
@@ -77,10 +83,12 @@ func crawlPage(host string, sitemap Sitemap, state CrawlState, queue chan CrawlS
 		//fmt.Println(url.Hostname())
 		if url.Hostname() == host || url.Hostname() == "" {
 			fmt.Printf("Found link: %v -> %v\n", state.Path, url.Path)
-			sitemap[state.Path].Add(url.Path)
-			queue <- CrawlState{url.Path, state.Depth - 1}
+			page.LinkSet.Add(url.Path)
+			chQueue <- CrawlState{url.Path, state.Depth - 1}
 		}
 	}
+	// Add completed page to the global state
+	chWrite <- page
 	return nil
 }
 
@@ -114,20 +122,24 @@ func main() {
 
 		sitemap := Sitemap{}
 
-		queue := make(chan CrawlState)
-		finished := make(chan bool)
+		chQueue := make(chan CrawlState, 100)
+		chWrite := make(chan Page, 1)
+		chFinished := make(chan bool)
+
 		openRoutines := 1
 		finishedRoutines := 0
-
-		go crawlPage(host, sitemap, CrawlState{"", depth}, queue, finished)
+		go crawlPage(host, sitemap, CrawlState{"", depth}, chQueue, chWrite, chFinished)
 
 		for finishedRoutines < openRoutines {
 			select {
-			case state := <-queue:
+			case state := <-chQueue:
 				openRoutines++
-				go crawlPage(host, sitemap, state, queue, finished)
-			case <-finished:
+				go crawlPage(host, sitemap, state, chQueue, chWrite, chFinished)
+			case page := <-chWrite:
+				sitemap[page.Path] = page
+			case <-chFinished:
 				finishedRoutines++
+				fmt.Printf("Crawling routine finished, %v left.", openRoutines-finishedRoutines)
 			}
 		}
 
