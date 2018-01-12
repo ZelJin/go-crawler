@@ -12,30 +12,36 @@ type Sitemap struct {
 	sitemap map[string]Page
 }
 
-func (s Sitemap) Set(key string, value Page) {
+func NewSitemap() *Sitemap {
+	return &Sitemap{
+		sitemap: map[string]Page{},
+	}
+}
+
+func (s *Sitemap) Set(key string, value Page) {
 	s.Lock()
 	defer s.Unlock()
 	s.sitemap[key] = value
 }
 
-func (s Sitemap) Get(key string) (Page, bool) {
+func (s *Sitemap) Get(key string) (Page, bool) {
 	s.Lock()
 	defer s.Unlock()
-	return s.sitemap[key]
+	value, found := s.sitemap[key]
+	return value, found
 }
 
-func (s Sitemap) GetSitemap() map[string]Page {
+func (s *Sitemap) GetSitemap() map[string]Page {
 	s.Lock()
 	defer s.Unlock()
 	return s.sitemap
 }
 
 // Print function prints a sitemap
-func (s Sitemap) Print() {
-	s.Lock()
-	defer s.Unlock()
+func (s *Sitemap) Print() {
 	fmt.Println("Sitemap:")
-	for _, page := range s.Sitemap {
+	sitemap := s.GetSitemap()
+	for _, page := range sitemap {
 		fmt.Println(page.Path)
 		for i, link := range page.LinkSet.List() {
 			symbol := "├── "
