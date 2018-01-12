@@ -96,6 +96,7 @@ func crawlPage(params *CrawlParams, visited *StringSet, chQueue chan *CrawlParam
 
 func main() {
 	var depth int
+	var threads int
 
 	app := cli.NewApp()
 	app.Name = "go-crawler"
@@ -104,10 +105,16 @@ func main() {
 	app.Version = "1.0.0"
 	app.Flags = []cli.Flag{
 		cli.IntFlag{
-			Name:        "d, depth",
+			Name:        "depth, d",
 			Value:       10,
-			Usage:       "Maximum crawling depth",
+			Usage:       "Crawling depth",
 			Destination: &depth,
+		},
+		cli.IntFlag{
+			Name:        "threads, t",
+			Value:       100,
+			Usage:       "Maximum parallel crawling threads",
+			Destination: &threads,
 		},
 	}
 
