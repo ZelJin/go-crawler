@@ -12,6 +12,9 @@ import (
 	"golang.org/x/net/html"
 )
 
+// CrawlParams is a struct that contains page crawling parameters.
+// It consists of a page that is being crawled and the remaining
+// crawling depth.
 type CrawlParams struct {
 	Page  *Page
 	Depth int
@@ -38,7 +41,7 @@ func extractLinks(body io.ReadCloser) (links []string) {
 	}
 }
 
-// Crawl a page specified by domain and relative path
+// Crawl a webpage.
 func crawlPage(params *CrawlParams, visited *StringSet, chQueue chan *CrawlParams, chFinished chan bool) {
 	defer func() { chFinished <- true }()
 
@@ -47,11 +50,13 @@ func crawlPage(params *CrawlParams, visited *StringSet, chQueue chan *CrawlParam
 		fmt.Println("Maximum depth has been reached, skipping.")
 		return
 	}
+
 	// Lock the page to prevent simultaneous reads and writes
 	params.Page.Lock()
 	defer params.Page.Unlock()
-	// Try to add empty page to global state to prevent it from being crawled
-	// multiple times. Return if this path already exists
+
+	// Check if the page has been visited
+	// If not, add the page to the "visited" set
 	added := visited.Add(params.Page.URL.String())
 	if !added {
 		fmt.Println("Page has already been crawled, skipping.")
@@ -75,13 +80,13 @@ func crawlPage(params *CrawlParams, visited *StringSet, chQueue chan *CrawlParam
 			fmt.Printf("Failed to parse a link: %s\n", err)
 			return
 		}
-		// If hostname is the same or link is relative
+		// If the hostname is the same or the link is relative
 		if linkURL.Hostname() == params.Page.URL.Hostname() || linkURL.Hostname() == "" {
-			// Resolve reference is the link is relative
+			// Resolve reference if the link is relative
 			if !linkURL.IsAbs() {
 				linkURL = params.Page.URL.ResolveReference(linkURL)
 			}
-			// Break if the page targets itself
+			// Break if the page links to itself
 			if linkURL.String() == params.Page.URL.String() {
 				break
 			}
@@ -120,16 +125,16 @@ func main() {
 
 	app.Action = func(c *cli.Context) error {
 		if !c.Args().Present() {
-			fmt.Println("Please specify a hostname.")
+			cli.ShowAppHelp(c)
 			return nil
 		}
 		url, err := url.Parse(c.Args().Get(0))
 		if err != nil {
-			fmt.Printf("Error parsing url: %s", err)
+			fmt.Printf("Error parsing url: %s\n", err)
 			return nil
 		}
 		if !url.IsAbs() {
-			fmt.Println("Please specify an absolute URL (like https://golang.org)")
+			fmt.Println("Please specify an absolute URL (like https://monzo.com)")
 			return nil
 		}
 
@@ -138,8 +143,8 @@ func main() {
 		// Generate a string set to track visited websites
 		visited := NewStringSet()
 
-		// Init queues
-		chQueue := make(chan *CrawlParams, 100)
+		// Init channels
+		chQueue := make(chan *CrawlParams, threads)
 		chFinished := make(chan bool)
 
 		// Init routines count
