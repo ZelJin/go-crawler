@@ -1,6 +1,11 @@
-hash: a83f82f1fc0e4eddf1808c15f9bf6f47242fe682f001b8eaa20ebc2e850ab0bd
-updated: 2018-01-11T21:00:49.263031+01:00
+hash: 62aac8d644b81026e00825b3205fa19aba667dcbea3b2602133bcaeeac3e30d2
+updated: 2018-01-12T01:42:01.077371+01:00
 imports:
 - name: github.com/urfave/cli
   version: cfb38830724cc34fedffe9a2a29fb54fa9169cd1
+- name: golang.org/x/net
+  version: ab555f366c4508dbe0802550b1b20c46c5c18aa0
+  subpackages:
+  - html
+  - html/atom
 testImports: []
