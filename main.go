@@ -67,7 +67,7 @@ func crawlPage(host string, sitemap *Sitemap, state *CrawlState, chQueue chan *C
 
 	// Add empty page to global state to prevent it from
 	// being crawled multiple times
-	page := Page{state.Path, NewStringSet()}
+	page := &Page{state.Path, NewStringSet()}
 	sitemap.Set(state.Path, page)
 
 	// Fetch the page
@@ -148,9 +148,7 @@ func main() {
 				fmt.Printf("Crawling routine finished, %v left\n", openRoutines-finishedRoutines)
 			}
 		}
-		fmt.Println("Finished")
 		sitemap.Print()
-		fmt.Println("Here")
 		elapsed := time.Since(start)
 		fmt.Printf("Crawling took %s\n", elapsed)
 		return nil
