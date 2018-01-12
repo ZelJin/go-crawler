@@ -50,27 +50,32 @@ func extractLinks(body io.ReadCloser) (links []string) {
 }
 
 // Crawl a page specified by domain and relative path
-func crawlPage(host string, sitemap Sitemap, state CrawlState, chQueue chan CrawlState, chWrite chan Page, chFinished chan bool) error {
+func crawlPage(host string, sitemap Sitemap, state CrawlState, chQueue chan CrawlState, chWrite chan Page, chFinished chan bool) {
+	defer func() { chFinished <- true }()
+
 	// Return if this path already exists
 	if _, found := sitemap[state.Path]; found {
 		fmt.Println("Page has already been crawled, skipping.")
-		return nil
+		return
 	}
+	// Return if reached max depth
 	if state.Depth < 0 {
 		fmt.Println("Maximum depth has been reached, skipping.")
-		return nil
+		return
 	}
-	// Add page to the global state
+
+	// Add empty page to global state to prevent it from
+	// being crawled multiple times
 	page := Page{state.Path, NewStringSet()}
 	chWrite <- page
+
 	// Fetch the page
 	fmt.Printf("Crawling %v\n", state.Path)
 	res, err := fetchPage(host, state.Path)
 	if err != nil {
-		return err
+		fmt.Println(err)
+		return
 	}
-
-	defer func() { chFinished <- true }()
 
 	// Extract links
 	defer res.Body.Close()
@@ -78,18 +83,20 @@ func crawlPage(host string, sitemap Sitemap, state CrawlState, chQueue chan Craw
 	for _, link := range links {
 		url, err := url.Parse(link)
 		if err != nil {
-			return err
+			fmt.Println()
+			return
 		}
-		//fmt.Println(url.Hostname())
+		// If hostname is the same or link is relative
 		if url.Hostname() == host || url.Hostname() == "" {
 			fmt.Printf("Found link: %v -> %v\n", state.Path, url.Path)
+			// Create a new routine and populate LinkSet
 			page.LinkSet.Add(url.Path)
 			chQueue <- CrawlState{url.Path, state.Depth - 1}
 		}
 	}
 	// Add completed page to the global state
 	chWrite <- page
-	return nil
+	return
 }
 
 func main() {
@@ -119,13 +126,14 @@ func main() {
 
 		// Start recording time
 		start := time.Now()
-
 		sitemap := Sitemap{}
 
+		// Init queues
 		chQueue := make(chan CrawlState, 100)
-		chWrite := make(chan Page, 1)
+		chWrite := make(chan Page)
 		chFinished := make(chan bool)
 
+		// Init routines count
 		openRoutines := 1
 		finishedRoutines := 0
 		go crawlPage(host, sitemap, CrawlState{"", depth}, chQueue, chWrite, chFinished)
@@ -144,10 +152,8 @@ func main() {
 		}
 
 		sitemap.Print()
-
 		elapsed := time.Since(start)
 		fmt.Printf("Crawling took %s\n", elapsed)
-
 		return nil
 	}
 
