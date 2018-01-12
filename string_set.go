@@ -1,19 +1,24 @@
 package main
 
-// StringSet is an implementation of a generic set of strings.
+import "sync"
+
+// StringSet is a thread-safe implementation of a generic set of strings.
 // Map is chosed as the baseline structure for its retrieval complexity of O(1)
 type StringSet struct {
+	sync.Mutex
 	set map[string]bool
 }
 
 // NewStringSet returns an empty StringSet
 func NewStringSet() StringSet {
-	return StringSet{map[string]bool{}}
+	return StringSet{set: map[string]bool{}}
 }
 
 // Add value to a StringSet
 // Returns a boolean value that indicates whether the item was added.
 func (s StringSet) Add(value string) bool {
+	s.Lock()
+	defer s.Unlock()
 	_, found := s.set[value]
 	s.set[value] = true
 	return !found
@@ -21,6 +26,8 @@ func (s StringSet) Add(value string) bool {
 
 // List all values stored in StringSet
 func (s StringSet) List() []string {
+	s.Lock()
+	defer s.Unlock()
 	list := make([]string, 0, len(s.set))
 	for k := range s.set {
 		list = append(list, k)
@@ -30,5 +37,7 @@ func (s StringSet) List() []string {
 
 // Length returns the length of the StringSet
 func (s StringSet) Length() int {
+	s.Lock()
+	defer s.Unlock()
 	return len(s.set)
 }
