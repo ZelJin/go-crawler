@@ -50,11 +50,12 @@ func extractLinks(body io.ReadCloser) (links []string) {
 }
 
 // Crawl a page specified by domain and relative path
-func crawlPage(host string, sitemap Sitemap, state CrawlState, chQueue chan CrawlState, chWrite chan Page, chFinished chan bool) {
+func crawlPage(host string, sitemap *Sitemap, state *CrawlState, chQueue chan *CrawlState, chFinished chan bool) {
 	defer func() { chFinished <- true }()
 
 	// Return if this path already exists
-	if _, found := sitemap[state.Path]; found {
+	_, found := sitemap.Get(state.Path)
+	if found {
 		fmt.Println("Page has already been crawled, skipping.")
 		return
 	}
@@ -67,7 +68,7 @@ func crawlPage(host string, sitemap Sitemap, state CrawlState, chQueue chan Craw
 	// Add empty page to global state to prevent it from
 	// being crawled multiple times
 	page := Page{state.Path, NewStringSet()}
-	chWrite <- page
+	sitemap.Set(state.Path, page)
 
 	// Fetch the page
 	fmt.Printf("Crawling %v\n", state.Path)
@@ -91,11 +92,11 @@ func crawlPage(host string, sitemap Sitemap, state CrawlState, chQueue chan Craw
 			fmt.Printf("Found link: %v -> %v\n", state.Path, url.Path)
 			// Create a new routine and populate LinkSet
 			page.LinkSet.Add(url.Path)
-			chQueue <- CrawlState{url.Path, state.Depth - 1}
+			chQueue <- &CrawlState{url.Path, state.Depth - 1}
 		}
 	}
 	// Add completed page to the global state
-	chWrite <- page
+	sitemap.Set(state.Path, page)
 	return
 }
 
@@ -126,32 +127,30 @@ func main() {
 
 		// Start recording time
 		start := time.Now()
-		sitemap := Sitemap{}
+		sitemap := NewSitemap()
 
 		// Init queues
-		chQueue := make(chan CrawlState, 100)
-		chWrite := make(chan Page)
+		chQueue := make(chan *CrawlState, 100)
 		chFinished := make(chan bool)
 
 		// Init routines count
 		openRoutines := 1
 		finishedRoutines := 0
-		go crawlPage(host, sitemap, CrawlState{"", depth}, chQueue, chWrite, chFinished)
+		go crawlPage(host, sitemap, &CrawlState{"", depth}, chQueue, chFinished)
 
 		for finishedRoutines < openRoutines {
 			select {
 			case state := <-chQueue:
 				openRoutines++
-				go crawlPage(host, sitemap, state, chQueue, chWrite, chFinished)
-			case page := <-chWrite:
-				sitemap[page.Path] = page
+				go crawlPage(host, sitemap, state, chQueue, chFinished)
 			case <-chFinished:
 				finishedRoutines++
-				fmt.Printf("Crawling routine finished, %v left.", openRoutines-finishedRoutines)
+				fmt.Printf("Crawling routine finished, %v left\n", openRoutines-finishedRoutines)
 			}
 		}
-
+		fmt.Println("Finished")
 		sitemap.Print()
+		fmt.Println("Here")
 		elapsed := time.Since(start)
 		fmt.Printf("Crawling took %s\n", elapsed)
 		return nil
