@@ -3,18 +3,18 @@ package main
 import "sync"
 
 // StringSet is a thread-safe implementation of a generic set of strings.
-// Map is chosed as the baseline structure for its retrieval complexity of O(1)
+// Map is chosen as the underlying structure for its retrieval complexity of O(1).
 type StringSet struct {
 	sync.Mutex
 	set map[string]bool
 }
 
-// NewStringSet returns an empty StringSet
+// NewStringSet returns an empty StringSet.
 func NewStringSet() *StringSet {
 	return &StringSet{set: map[string]bool{}}
 }
 
-// Add value to a StringSet
+// Add value to a StringSet.
 // Returns a boolean value that indicates whether the item was added.
 func (s *StringSet) Add(value string) bool {
 	s.Lock()
@@ -24,7 +24,7 @@ func (s *StringSet) Add(value string) bool {
 	return !found
 }
 
-// List all values stored in StringSet
+// List all values stored in StringSet.
 func (s *StringSet) List() []string {
 	s.Lock()
 	defer s.Unlock()
@@ -35,7 +35,7 @@ func (s *StringSet) List() []string {
 	return list
 }
 
-// Length returns the length of the StringSet
+// Length function returns the length of a StringSet.
 func (s *StringSet) Length() int {
 	s.Lock()
 	defer s.Unlock()
