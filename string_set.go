@@ -10,13 +10,13 @@ type StringSet struct {
 }
 
 // NewStringSet returns an empty StringSet
-func NewStringSet() StringSet {
-	return StringSet{set: map[string]bool{}}
+func NewStringSet() *StringSet {
+	return &StringSet{set: map[string]bool{}}
 }
 
 // Add value to a StringSet
 // Returns a boolean value that indicates whether the item was added.
-func (s StringSet) Add(value string) bool {
+func (s *StringSet) Add(value string) bool {
 	s.Lock()
 	defer s.Unlock()
 	_, found := s.set[value]
@@ -25,7 +25,7 @@ func (s StringSet) Add(value string) bool {
 }
 
 // List all values stored in StringSet
-func (s StringSet) List() []string {
+func (s *StringSet) List() []string {
 	s.Lock()
 	defer s.Unlock()
 	list := make([]string, 0, len(s.set))
@@ -36,7 +36,7 @@ func (s StringSet) List() []string {
 }
 
 // Length returns the length of the StringSet
-func (s StringSet) Length() int {
+func (s *StringSet) Length() int {
 	s.Lock()
 	defer s.Unlock()
 	return len(s.set)
