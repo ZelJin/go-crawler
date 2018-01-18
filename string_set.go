@@ -20,7 +20,9 @@ func (s *StringSet) Add(value string) bool {
 	s.Lock()
 	defer s.Unlock()
 	_, found := s.set[value]
-	s.set[value] = true
+	if !found {
+		s.set[value] = true
+	}
 	return !found
 }
 
