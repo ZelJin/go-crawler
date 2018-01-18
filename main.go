@@ -42,8 +42,8 @@ func extractLinks(body io.ReadCloser) (links []string) {
 }
 
 // Crawl a webpage.
-func crawlPage(params *CrawlParams, visited *StringSet, chQueue chan *CrawlParams, chFinished chan bool) {
-	defer func() { chFinished <- true }()
+func crawlPage(params *CrawlParams, visited *StringSet, queue chan *CrawlParams, workers chan bool) {
+	defer func() { <-workers }()
 
 	// Return if reached max depth
 	if params.Depth < 0 {
@@ -93,15 +93,14 @@ func crawlPage(params *CrawlParams, visited *StringSet, chQueue chan *CrawlParam
 			fmt.Printf("Found link: %v -> %v\n", params.Page.URL, linkURL)
 			childPage := NewPage(linkURL)
 			params.Page.Links = append(params.Page.Links, childPage)
-			chQueue <- &CrawlParams{childPage, params.Depth - 1}
+			queue <- &CrawlParams{childPage, params.Depth - 1}
 		}
 	}
 	return
 }
 
 func main() {
-	var depth int
-	var threads int
+	var depth, workers, queue int
 
 	app := cli.NewApp()
 	app.Name = "go-crawler"
@@ -116,10 +115,16 @@ func main() {
 			Destination: &depth,
 		},
 		cli.IntFlag{
-			Name:        "threads, t",
+			Name:        "workers, w",
+			Value:       3,
+			Usage:       "Maximum parallel crawling workers",
+			Destination: &workers,
+		},
+		cli.IntFlag{
+			Name:        "queue, q",
 			Value:       100,
-			Usage:       "Maximum parallel crawling threads",
-			Destination: &threads,
+			Usage:       "Maximum crawling queue",
+			Destination: &queue,
 		},
 	}
 
@@ -144,27 +149,21 @@ func main() {
 		visited := NewStringSet()
 
 		// Init channels
-		chQueue := make(chan *CrawlParams, threads)
-		chFinished := make(chan bool)
+		workers := make(chan bool, 100)
+		queue := make(chan *CrawlParams, 10000)
 
-		// Init routines count
-		openRoutines := 1
-		finishedRoutines := 0
-
-		fmt.Printf("Started crawling %v\n", url.String())
 		rootPage := NewPage(url)
-		go crawlPage(&CrawlParams{rootPage, depth}, visited, chQueue, chFinished)
+		queue <- &CrawlParams{rootPage, depth}
 
-		for finishedRoutines < openRoutines {
-			select {
-			case params := <-chQueue:
-				openRoutines++
-				go crawlPage(params, visited, chQueue, chFinished)
-			case <-chFinished:
-				finishedRoutines++
-				fmt.Printf("Crawling routine finished, %v left\n", openRoutines-finishedRoutines)
-			}
+		for params := range queue {
+			workers <- true
+			go crawlPage(params, visited, queue, workers)
 		}
+
+		for i := 0; i < cap(workers); i++ {
+			workers <- true
+		}
+
 		rootPage.PrintSitemap()
 		elapsed := time.Since(start)
 		fmt.Printf("Crawling took %s\n", elapsed)
