@@ -54,7 +54,7 @@ func crawlPage(params *CrawlParams, visited *StringSet, queue chan *CrawlParams,
 	}()
 
 	// Return if reached max depth
-	if params.Depth < 0 {
+	if params.Depth <= 0 {
 		fmt.Println("Maximum depth has been reached, skipping.")
 		return
 	}
