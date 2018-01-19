@@ -45,12 +45,14 @@ func extractLinks(body io.ReadCloser) (links []string) {
 func crawlPage(params *CrawlParams, visited *StringSet, queue chan *CrawlParams, workers chan bool) {
 	defer func() {
 		<-workers
-		fmt.Printf("Finished processing url %s\n", params.Page.URL.String())
-		fmt.Println(len(workers), len(queue))
 		if len(workers) == 0 && len(queue) == 0 {
-			// TODO: Possible race condition?
+			// Dirty hack: sleep for 1 second before closing
+			// the channel to avoid race condition in the end
+			time.Sleep(time.Second)
 			close(queue)
 		}
+		fmt.Printf("Finished processing url %s\n", params.Page.URL.String())
+		fmt.Println(len(workers), len(queue))
 	}()
 
 	// Return if reached max depth
