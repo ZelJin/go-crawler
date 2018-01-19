@@ -43,7 +43,15 @@ func extractLinks(body io.ReadCloser) (links []string) {
 
 // Crawl a webpage.
 func crawlPage(params *CrawlParams, visited *StringSet, queue chan *CrawlParams, workers chan bool) {
-	defer func() { <-workers }()
+	defer func() {
+		<-workers
+		fmt.Printf("Finished processing url %s\n", params.Page.URL.String())
+		fmt.Println(len(workers), len(queue))
+		if len(workers) == 0 && len(queue) == 0 {
+			// TODO: Possible race condition?
+			close(queue)
+		}
+	}()
 
 	// Return if reached max depth
 	if params.Depth < 0 {
@@ -64,7 +72,6 @@ func crawlPage(params *CrawlParams, visited *StringSet, queue chan *CrawlParams,
 	}
 
 	// Fetch the page
-	fmt.Printf("Crawling %v\n", params.Page.URL)
 	res, err := http.Get(params.Page.URL.String())
 	if err != nil {
 		fmt.Println(err)
@@ -92,6 +99,10 @@ func crawlPage(params *CrawlParams, visited *StringSet, queue chan *CrawlParams,
 			}
 			fmt.Printf("Found link: %v -> %v\n", params.Page.URL, linkURL)
 			childPage := NewPage(linkURL)
+			// Check if the maximum queue capacity is reached.
+			if len(queue) == cap(queue) {
+				panic("Deadlock! Queue limit reached.")
+			}
 			params.Page.Links = append(params.Page.Links, childPage)
 			queue <- &CrawlParams{childPage, params.Depth - 1}
 		}
@@ -116,13 +127,13 @@ func main() {
 		},
 		cli.IntFlag{
 			Name:        "workers, w",
-			Value:       3,
+			Value:       100,
 			Usage:       "Maximum parallel crawling workers",
 			Destination: &workers,
 		},
 		cli.IntFlag{
 			Name:        "queue, q",
-			Value:       100,
+			Value:       100000,
 			Usage:       "Maximum crawling queue",
 			Destination: &queue,
 		},
@@ -149,19 +160,16 @@ func main() {
 		visited := NewStringSet()
 
 		// Init channels
-		workers := make(chan bool, 100)
-		queue := make(chan *CrawlParams, 10000)
+		workers := make(chan bool, workers)
+		queue := make(chan *CrawlParams, queue)
 
 		rootPage := NewPage(url)
 		queue <- &CrawlParams{rootPage, depth}
 
 		for params := range queue {
 			workers <- true
+			fmt.Printf("Started processing url %s\n", params.Page.URL.String())
 			go crawlPage(params, visited, queue, workers)
-		}
-
-		for i := 0; i < cap(workers); i++ {
-			workers <- true
 		}
 
 		rootPage.PrintSitemap()
